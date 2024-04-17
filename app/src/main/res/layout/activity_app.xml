@@ -11,6 +11,7 @@
         android:layout_width="300dp"
         android:layout_height="300dp"
         android:layout_gravity="center"
+        app:animation="R.anim.anim_lection"
         app:lineWidth="20dp"
         app:fontSize="50dp"
         app:colors="@array/colors"

@@ -8,6 +8,6 @@
         <item>@color/colorPrimary</item>
         <item>@color/colorAccent</item>
         <item>#FFDE03</item>
-        <item>#FF0266</item>
+        <item>#DDDDDD</item>
     </array>
 </resources>

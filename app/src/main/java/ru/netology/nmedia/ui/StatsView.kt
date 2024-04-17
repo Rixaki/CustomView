@@ -2,15 +2,20 @@ package ru.netology.nmedia.ui
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import android.view.animation.AnimationUtils
+import androidx.core.content.res.TypedArrayUtils.getResourceId
 import androidx.core.content.withStyledAttributes
 import ru.netology.nmedia.R
 import ru.netology.nmedia.util.AndroidUtils
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 import kotlin.random.Random
 
 class StatsView @JvmOverloads constructor(
@@ -70,16 +75,46 @@ class StatsView @JvmOverloads constructor(
         val sumOfValues = data.sum()
 
         var startFrom = -90F
+
+        var firstColor = randomColor()
+        var prelastColor = randomColor()
+        var prelastArcEnd = 0F
+
         for ((index, datum) in data.withIndex()) {
-            //val angle = 360F * datum
             val angle = 360F * datum / sumOfValues
             paint.color = colors.getOrNull(index) ?: randomColor()
+            //data for first dot
+            if (index == 0) {
+                firstColor = paint.color
+            }
             canvas.drawArc(oval, startFrom, angle, false, paint)
             startFrom += angle
+            //data for prelast dot
+            if ((data.size >= 2) && (index == data.size-2)) {
+                prelastColor = paint.color
+                prelastArcEnd = startFrom*Math.PI.toFloat()/180F
+            }
+        }
+        //first dot
+        paint.color = firstColor
+        canvas.drawPoint(center.x, center.y - radius, paint)
+
+        //prelast dot
+        if (data[data.lastIndex] > 0F) {
+            paint.color = prelastColor
+            canvas.drawPoint(
+                center.x + radius * cos(prelastArcEnd),
+                center.y + radius * sin(prelastArcEnd),
+                paint
+            )
         }
 
+        fun predicate(cancelIndex: Int): (index: Int, _: Any) -> Boolean
+                = { index, _-> index != cancelIndex }
+        val ratio = 100 *
+            data.filterIndexed(predicate(data.lastIndex)).sum()/data.sum()
         canvas.drawText(
-            "%.2f".format(data.sum()),
+            "%.2f%%".format(ratio),
             center.x,
             center.y + textPaint.textSize / 4,
             textPaint,
