@@ -5,10 +5,10 @@
         <attr name="fontSize" format="dimension|reference" />
         <attr name="colors" format="reference" />
         <attr name="animation" format="enum">
-            <enum name = "R.anim.anim_lection" value="0"/>
-            <enum name = "R.anim.anim_rotation" value="1"/>
-            <enum name = "R.anim.anim_sequential" value="2"/>
-            <enum name = "R.anim.anim_bidirectional" value="3"/>
+            <enum name="lection" value="0" />
+            <enum name="rotation" value="1" />
+            <enum name="sequential" value="2" />
+            <enum name="bidirectional" value="3" />
         </attr>
     </declare-styleable>
 </resources>

@@ -1,15 +1,14 @@
 package ru.netology.nmedia.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-import android.view.animation.AnimationUtils
-import androidx.core.content.res.TypedArrayUtils.getResourceId
+import android.view.animation.LinearInterpolator
 import androidx.core.content.withStyledAttributes
 import ru.netology.nmedia.R
 import ru.netology.nmedia.util.AndroidUtils
@@ -32,12 +31,19 @@ class StatsView @JvmOverloads constructor(
     private var fontSize = AndroidUtils.dp(context, 40F).toFloat()
     private var colors = emptyList<Int>()
 
+    private var progress = 0F
+    private var valueAnimator: ValueAnimator? = null
+
+    private var animOption: Int = 1//will take to another link by app xml
+
     init {
         context.withStyledAttributes(attrs, R.styleable.StatsView) {
             lineWidth = getDimension(R.styleable.StatsView_lineWidth, lineWidth)
             fontSize = getDimension(R.styleable.StatsView_fontSize, fontSize)
             val resId = getResourceId(R.styleable.StatsView_colors, 0)
             colors = resources.getIntArray(resId).toList()
+            animOption = getInteger(R.styleable.StatsView_animation, animOption)
+            //println("num anim: $animOption")
         }
     }
 
@@ -56,8 +62,10 @@ class StatsView @JvmOverloads constructor(
     var data: List<Float> = emptyList()
         set(value) {
             field = value
-            invalidate()//onDraw calls
+            update()
+            //invalidate()//onDraw calls
         }
+    //val drawStatusFlags = ArrayList<Boolean>()
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         radius = min(w, h) / 2F - lineWidth / 2
@@ -75,32 +83,116 @@ class StatsView @JvmOverloads constructor(
         val sumOfValues = data.sum()
 
         var startFrom = -90F
+        val maxAngle = -90F + 360F * progress
 
         var firstColor = randomColor()
         var prelastColor = randomColor()
         var prelastArcEnd = 0F
 
+        //drawText
+        fun predicate(cancelIndex: Int): (index: Int, _: Any) -> Boolean =
+            { index, _ -> index != cancelIndex }
+
+        val ratio = 100 *
+                data.filterIndexed(predicate(data.lastIndex)).sum() / data.sum()
+        canvas.drawText(
+            "%.2f%%".format(ratio),
+            center.x,
+            center.y + textPaint.textSize / 4,
+            textPaint,
+        )
+
+        //cycle
         for ((index, datum) in data.withIndex()) {
-            val angle = 360F * datum / sumOfValues
+            val angle = when (animOption) {
+                2 -> { //sequential
+                    min(
+                        360F * datum / sumOfValues,
+                        maxAngle - startFrom
+                    )
+                }
+
+                else -> {
+                    360F * datum / sumOfValues
+                }
+            }
             paint.color = colors.getOrNull(index) ?: randomColor()
+
             //data for first dot
             if (index == 0) {
                 firstColor = paint.color
             }
-            canvas.drawArc(oval, startFrom, angle, false, paint)
+
+            when (animOption) {
+                0 -> { //lection, sequential
+                    canvas.drawArc(
+                        oval,
+                        startFrom,
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                }
+
+                1 -> { //rotation
+                    canvas.drawArc(
+                        oval,
+                        startFrom - 360F * (1F - progress),
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                }
+
+                2 -> { //sequential
+                    canvas.drawArc(
+                        oval,
+                        startFrom,
+                        angle,
+                        false,
+                        paint
+                    )
+                }
+
+                3 -> { //bidirectional
+                    canvas.drawArc(
+                        oval,
+                        startFrom + angle * 0.5F,
+                        angle * progress * 0.5F,
+                        false,
+                        paint
+                    )
+                    canvas.drawArc(
+                        oval,
+                        startFrom + angle * 0.5F,
+                        -angle * progress * 0.5F,
+                        false,
+                        paint
+                    )
+                }
+            }
+
             startFrom += angle
+
             //data for prelast dot
-            if ((data.size >= 2) && (index == data.size-2)) {
+            if ((data.size >= 2) && (index == data.size - 2)) {
                 prelastColor = paint.color
-                prelastArcEnd = startFrom*Math.PI.toFloat()/180F
+                prelastArcEnd = startFrom * Math.PI.toFloat() / 180F
+            }
+
+            if ((startFrom > maxAngle) && (animOption == 2)) {
+                return
             }
         }
+
         //first dot
-        paint.color = firstColor
-        canvas.drawPoint(center.x, center.y - radius, paint)
+        if ((progress == 1F) && (animOption == 0)) {
+            paint.color = firstColor
+            canvas.drawPoint(center.x, center.y - radius, paint)
+        }
 
         //prelast dot
-        if (data[data.lastIndex] > 0F) {
+        if ((data[data.lastIndex] > 0F) && (progress == 1F) && (animOption == 0)) {
             paint.color = prelastColor
             canvas.drawPoint(
                 center.x + radius * cos(prelastArcEnd),
@@ -108,18 +200,27 @@ class StatsView @JvmOverloads constructor(
                 paint
             )
         }
-
-        fun predicate(cancelIndex: Int): (index: Int, _: Any) -> Boolean
-                = { index, _-> index != cancelIndex }
-        val ratio = 100 *
-            data.filterIndexed(predicate(data.lastIndex)).sum()/data.sum()
-        canvas.drawText(
-            "%.2f%%".format(ratio),
-            center.x,
-            center.y + textPaint.textSize / 4,
-            textPaint,
-        )
     }
 
-    private fun randomColor() = Random.nextInt(0xFF000000.toInt(), 0xFFFFFFFF.toInt())
+    private fun update() {
+        valueAnimator?.let {
+            it.removeAllListeners()
+            it.cancel()
+        }
+        progress = 0F
+
+        valueAnimator = ValueAnimator.ofFloat(0F, 1F).apply {
+            addUpdateListener { anim ->
+                progress = anim.animatedValue as Float
+                invalidate()
+            }
+            duration = 1500
+            interpolator = LinearInterpolator()
+        }.also {
+            it.start()
+        }
+    }
+
+    private fun randomColor() =
+        Random.nextInt(0xFF000000.toInt(), 0xFFFFFFFF.toInt())
 }
