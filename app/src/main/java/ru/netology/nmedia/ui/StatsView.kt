@@ -34,7 +34,7 @@ class StatsView @JvmOverloads constructor(
     private var progress = 0F
     private var valueAnimator: ValueAnimator? = null
 
-    private var animOption: Int = 1//will take to another link by app xml
+    private var animOption: Int = 0//will take to another link by app xml
 
     init {
         context.withStyledAttributes(attrs, R.styleable.StatsView) {
@@ -62,8 +62,11 @@ class StatsView @JvmOverloads constructor(
     var data: List<Float> = emptyList()
         set(value) {
             field = value
-            update()
-            //invalidate()//onDraw calls
+            if (animOption == 0) {
+                invalidate()//onDraw calls
+            } else {
+                update()
+            }
         }
     //val drawStatusFlags = ArrayList<Boolean>()
 
@@ -105,7 +108,7 @@ class StatsView @JvmOverloads constructor(
         //cycle
         for ((index, datum) in data.withIndex()) {
             val angle = when (animOption) {
-                2 -> { //sequential
+                3 -> { //sequential
                     min(
                         360F * datum / sumOfValues,
                         maxAngle - startFrom
@@ -124,27 +127,7 @@ class StatsView @JvmOverloads constructor(
             }
 
             when (animOption) {
-                0 -> { //lection, sequential
-                    canvas.drawArc(
-                        oval,
-                        startFrom,
-                        angle * progress,
-                        false,
-                        paint
-                    )
-                }
-
-                1 -> { //rotation
-                    canvas.drawArc(
-                        oval,
-                        startFrom - 360F * (1F - progress),
-                        angle * progress,
-                        false,
-                        paint
-                    )
-                }
-
-                2 -> { //sequential
+                0 -> { //no_animation
                     canvas.drawArc(
                         oval,
                         startFrom,
@@ -154,7 +137,37 @@ class StatsView @JvmOverloads constructor(
                     )
                 }
 
-                3 -> { //bidirectional
+                1 -> { //lection
+                    canvas.drawArc(
+                        oval,
+                        startFrom,
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                }
+
+                2 -> { //rotation
+                    canvas.drawArc(
+                        oval,
+                        startFrom - 360F * (1F - progress),
+                        angle * progress,
+                        false,
+                        paint
+                    )
+                }
+
+                3 -> { //sequential
+                    canvas.drawArc(
+                        oval,
+                        startFrom,
+                        angle,
+                        false,
+                        paint
+                    )
+                }
+
+                4 -> { //bidirectional
                     canvas.drawArc(
                         oval,
                         startFrom + angle * 0.5F,
@@ -180,19 +193,21 @@ class StatsView @JvmOverloads constructor(
                 prelastArcEnd = startFrom * Math.PI.toFloat() / 180F
             }
 
-            if ((startFrom > maxAngle) && (animOption == 2)) {
+            //sequential
+            if ((startFrom > maxAngle) && (animOption == 3)) {
                 return
             }
         }
 
         //first dot
-        if ((progress == 1F) && (animOption == 0)) {
+        if ((animOption == 1) && (progress == 1F)) {
             paint.color = firstColor
             canvas.drawPoint(center.x, center.y - radius, paint)
         }
 
         //prelast dot
-        if ((data[data.lastIndex] > 0F) && (progress == 1F) && (animOption == 0)) {
+        if ((data[data.lastIndex] > 0F) &&
+            (progress == 1F) && (animOption == 1)) {
             paint.color = prelastColor
             canvas.drawPoint(
                 center.x + radius * cos(prelastArcEnd),
